@@ -28,23 +28,22 @@ import org.apache.flink.streaming.api.windowing.time.Time;
  * help reduce the number of elements that are ignored due to lateness when computing the final result for a
  * given window, in the case where we know that elements arrive no later than <code>t_late</code> units of time
  * after the watermark that signals that the system event-time has advanced past their (event-time) timestamp.
- * */
+ */
+/* 在计算给定窗口最终结果时，减少因为延迟到来而被丢弃的数据 */
 public abstract class BoundedOutOfOrdernessTimestampExtractor<T> implements AssignerWithPeriodicWatermarks<T> {
-
+	// 这个T泛指传入数据中的每一个元素，可以使用case class转换
 	private static final long serialVersionUID = 1L;
 
-	/** The current maximum timestamp seen so far. */
+	/* 当前已经进入flink所有数据中最大的event time */
 	private long currentMaxTimestamp;
 
-	/** The timestamp of the last emitted watermark. */
+	/* 上一次发送的水印，初始化默认是Long里面最小的数(负的) */
 	private long lastEmittedWatermark = Long.MIN_VALUE;
 
-	/**
-	 * The (fixed) interval between the maximum seen timestamp seen in the records
-	 * and that of the watermark to be emitted.
-	 */
+	/* 就是最大延迟时间 = currentMaxTimestamp - lastEmittedWatermark */
 	private final long maxOutOfOrderness;
 
+	// 初始化，maxOutOfOrderness是初始化的最大延迟时间
 	public BoundedOutOfOrdernessTimestampExtractor(Time maxOutOfOrderness) {
 		if (maxOutOfOrderness.toMilliseconds() < 0) {
 			throw new RuntimeException("Tried to set the maximum allowed " +
@@ -58,14 +57,10 @@ public abstract class BoundedOutOfOrdernessTimestampExtractor<T> implements Assi
 		return maxOutOfOrderness;
 	}
 
-	/**
-	 * Extracts the timestamp from the given element.
-	 *
-	 * @param element The element that the timestamp is extracted from.
-	 * @return The new timestamp.
-	 */
+	/* 从流基本元素(如每一条日志)中提取event time，可使用匿名实现类重写此方法 */
 	public abstract long extractTimestamp(T element);
 
+	/* 为当前生成水印，如果最大时间戳不边，那么水印也不会变 */
 	@Override
 	public final Watermark getCurrentWatermark() {
 		// this guarantees that the watermark never goes backwards.
@@ -76,6 +71,7 @@ public abstract class BoundedOutOfOrdernessTimestampExtractor<T> implements Assi
 		return new Watermark(lastEmittedWatermark);
 	}
 
+	/* 提取event time来更新当前最大的event time */
 	@Override
 	public final long extractTimestamp(T element, long previousElementTimestamp) {
 		long timestamp = extractTimestamp(element);
